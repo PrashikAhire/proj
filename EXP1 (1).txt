@@ -1,0 +1,149 @@
+import numpy as np
+from tabulate import tabulate
+import matplotlib.pyplot as plt
+
+def generate_walsh_matrix(n):
+    """Generate a Walsh matrix of size 2^n x 2^n."""
+    if n == 1:
+        return np.array([[1, 1], [1, -1]])
+    else:
+        smaller_matrix = generate_walsh_matrix(n - 1)
+        top = np.hstack((smaller_matrix, smaller_matrix))
+        bottom = np.hstack((smaller_matrix, -smaller_matrix))
+        return np.vstack((top, bottom))
+
+def calculate_snr(transmitted_signal, walsh_code, intended_message=None, verbose=True):
+    """Calculate SNR for a receiver."""
+    correlation = np.dot(transmitted_signal, walsh_code) / len(walsh_code)
+
+    if intended_message is not None:
+        signal_power = correlation ** 2 * 10
+    else:
+        signal_power = max(correlation ** 6, 1e-12)
+
+    noise_components = (transmitted_signal - walsh_code * correlation
+                        if intended_message is not None
+                        else transmitted_signal)
+    
+    noise_power = np.var(noise_components) if np.var(noise_components) > 0 else 1e-10
+    snr = 10 * np.log10(signal_power / noise_power)
+
+    if verbose:
+        print("\n========== Detailed SNR Calculation ==========")
+        print("Walsh Code:", walsh_code)
+        print("Transmitted Signal:", transmitted_signal)
+        print(f"Correlation: {correlation:.4f}")
+        print(f"Signal Power: {signal_power:.4f}")
+        print("Noise Components:", noise_components)
+        print(f"Noise Power: {noise_power:.4f}")
+        print(f"SNR (dB): {snr:.4f}")
+
+    return correlation, signal_power, noise_components, noise_power, snr
+
+def cdma_simulation():
+    num_subscribers = 32
+    log2_n = int(np.log2(num_subscribers))
+
+    walsh_matrix = generate_walsh_matrix(log2_n)
+    print("\n========== Walsh Matrix (32x32) ==========")
+    print(walsh_matrix)
+
+    messages = np.random.choice([-1, 1], num_subscribers)
+    print("\n========== Subscriber Messages (32 subscribers) ==========")
+    print(messages)
+
+    encoded_signals = np.array([messages[i] * walsh_matrix[i] for i in range(num_subscribers)])
+    print("\n========== Encoded Signals (32 subscribers) ==========")
+    print(encoded_signals)
+
+    transmitted_signal = np.sum(encoded_signals, axis=0).astype(np.float64)
+    noise = np.random.normal(0, 0.5, transmitted_signal.shape)
+    transmitted_signal += noise
+    
+    print("\n========== Transmitted Signal (32-bit) ==========")
+    print(transmitted_signal)
+
+    total_power = np.sum(transmitted_signal ** 2)
+    mean_transmitted_signal = np.mean(transmitted_signal)
+    var_transmitted_signal = np.var(transmitted_signal)
+    print("\n========== Overall Transmitted Signal Statistics ==========")
+    print(f"Total Power: {total_power:.4f}")
+    print(f"Mean: {mean_transmitted_signal:.4f}")
+    print(f"Variance: {var_transmitted_signal:.4f}")
+
+    intended_index = np.random.randint(0, num_subscribers)
+    non_intended_index = (intended_index + 1) % num_subscribers
+    print("\n========== Receiver Indices ==========")
+    print(f"Intended Receiver: User {intended_index} with message {messages[intended_index]}")
+    print(f"Non-Intended Receiver: User {non_intended_index} with message {messages[non_intended_index]}")
+
+    print("\n========== SNR Calculation for Intended Receiver ==========")
+    intended_stats = calculate_snr(transmitted_signal, walsh_matrix[intended_index], intended_message=messages[intended_index])
+    intended_snr = intended_stats[4]
+
+    print("\n========== SNR Calculation for Non-Intended Receiver ==========")
+    non_intended_stats = calculate_snr(transmitted_signal, walsh_matrix[non_intended_index], intended_message=None)
+    non_intended_snr = non_intended_stats[4]
+
+    interference_power = total_power - intended_stats[1]
+    print("\n========== Interference Power ==========")
+    print(f"Interference Power: {interference_power:.4f}")
+
+    summary_table = [
+        [f"Intended (User {intended_index}, Msg {messages[intended_index]})", intended_index, *intended_stats, 0],
+        [f"Non-Intended (User {non_intended_index}, Msg {messages[non_intended_index]})", non_intended_index, *non_intended_stats, intended_snr - non_intended_snr]
+    ]
+    headers = ["Receiver Type", "Index", "Correlation", "Signal Power", "Noise Components", "Noise Power", "SNR (dB)", "SNR Diff (dB)"]
+    print("\n========== CDMA Simulation Detailed Results ==========")
+    print(tabulate(summary_table, headers=headers, tablefmt="fancy_grid", floatfmt=".4f"))
+
+    snr_values = []
+    all_receivers_summary = []
+    for i in range(num_subscribers):
+        corr, sig_power, _, noise_power, snr = calculate_snr(
+            transmitted_signal,
+            walsh_matrix[i],
+            intended_message=messages[i] if i == intended_index else None,
+            verbose=False
+        )
+        snr_diff = intended_snr - snr
+        all_receivers_summary.append([i, corr, sig_power, noise_power, snr, snr_diff])
+        snr_values.append(snr)
+
+    headers_all = ["Receiver Index", "Correlation", "Signal Power", "Noise Power", "SNR (dB)", "SNR Diff (dB)"]
+    print("\n========== SNR for Every Receiver (32 subscribers) ==========")
+    print(tabulate(all_receivers_summary, headers=headers_all, tablefmt="fancy_grid", floatfmt=".4f"))
+
+    snrs = [item[4] for item in all_receivers_summary]
+    best_index = np.argmax(snrs)
+    worst_index = np.argmin(snrs)
+    print("\n========== SNR Comparison ==========")
+    print(f"Best SNR is Receiver {best_index} with SNR = {snrs[best_index]:.4f} dB")
+    print(f"Worst SNR is Receiver {worst_index} with SNR = {snrs[worst_index]:.4f} dB")
+
+    plt.figure(figsize=(12, 6))
+    receiver_indices = np.arange(num_subscribers)
+    colors = ['gray'] * num_subscribers
+    colors[intended_index] = 'green'
+    colors[non_intended_index] = 'red'
+    colors[worst_index] = 'blue'
+
+    plt.bar(receiver_indices, snr_values, color=colors)
+    plt.xlabel('Receiver Index')
+    plt.ylabel('SNR (dB)')
+    plt.title('SNR for All Receivers')
+    plt.axhline(y=0, color='black', linestyle='--', linewidth=0.5)
+    plt.grid(True, axis='y', linestyle='--', alpha=0.7)
+
+    plt.legend(handles=[
+        plt.Rectangle((0, 0), 1, 1, color='green', label=f'Intended (Index {intended_index})'),
+        plt.Rectangle((0, 0), 1, 1, color='red', label=f'Non-Intended (Index {non_intended_index})'),
+        plt.Rectangle((0, 0), 1, 1, color='blue', label=f'Minimum SNR (Index {worst_index})'),
+        plt.Rectangle((0, 0), 1, 1, color='gray', label='Other Receivers')
+    ])
+    plt.tight_layout()
+    plt.show()
+
+# Run the simulation
+if __name__ == "__main__":
+    cdma_simulation()

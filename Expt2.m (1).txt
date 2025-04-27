@@ -1,0 +1,44 @@
+% Frequency Reuse Strategy Calculation in Octave
+
+% Given data
+S = 10;  % Total number of channels available
+zones = 3;  % Number of zones in the network
+subscribers = [10000, 15000, 5000];  % Number of subscribers in each zone
+radius = [25, 30, 15];  % Radius of each zone in km
+
+% Display given data for clarification
+fprintf('Given Data:\n');
+fprintf('Total available channels (S): %d\n', S);
+fprintf('Number of zones: %d\n', zones);
+fprintf('Subscribers in each zone: %d, %d, %d\n', subscribers);
+fprintf('Radius of each zone (km): %d, %d, %d\n', radius);
+
+% Calculate channels per cell (each cell gets S/zones channels)
+channels_per_cell = floor(S / zones);
+fprintf('\nCalculation Steps:\n');
+fprintf('Step 1: Channels per cell = Total Channels (S) / Number of zones\n');
+fprintf('        Channels per cell = %d / %d = %d\n', S, zones, channels_per_cell);
+
+% Compute total call demand based on the number of subscribers and calls per user
+calls_per_user = 15;  % Number of simultaneous calls per user
+total_calls = sum(subscribers) * calls_per_user;
+fprintf('Step 2: Total call demand = sum(subscribers) * Calls per user\n');
+fprintf('        Total call demand = (%d + %d + %d) * %d = %d\n', subscribers(1), subscribers(2), subscribers(3), calls_per_user, total_calls);
+
+% Allocate channels proportionally based on subscriber demand
+fprintf('Step 3: Channel Allocation Formula:\n');
+fprintf('        Channel Allocation = ((Subscribers * Calls per User) / Total Calls) * Channels per Cell * Zones\n');
+channel_allocation = ((subscribers * calls_per_user) / total_calls) * channels_per_cell * zones;
+channel_allocation = round(channel_allocation); % Round to the nearest whole number
+
+fprintf('Step 4: Allocating channels proportionally to each zone:\n');
+for i = 1:zones
+    fprintf('        Zone %d allocation = ((%d * %d) / %d) * %d * %d = %d\n', i, subscribers(i), calls_per_user, total_calls, channels_per_cell, zones, channel_allocation(i));
+end
+
+% Display the final results
+fprintf('\nFinal Channel Allocation:\n');
+fprintf('Channels per cell: %d\n', channels_per_cell);
+for i = 1:zones
+    fprintf('Zone %d: %d channels allocated\n', i, channel_allocation(i));
+end
