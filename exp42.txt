@@ -1,0 +1,68 @@
+clear;
+N = 10^6;
+rng(100); % Set random seed
+% Transmitter
+ip = rand(1,N) > 0.5;
+s = 2*ip - 1;
+n = (1/sqrt(2)) * (randn(1,N) + 1i*randn(1,N));
+Eb_N0_db = -3:10;
+nErr = zeros(1, length(Eb_N0_db)); % Pre-allocate memory
+for ii = 1:length(Eb_N0_db)
+y = s + 10^(-Eb_N0_db(ii)/20) * n;
+ipHat = real(y) > 0;
+nErr(ii) = sum(ip ~= ipHat);
+end
+simBer = nErr / N;
+theoryBer = 0.5 * erfc(sqrt(10.^(Eb_N0_db / 10)));
+% Plot results
+figure;
+semilogy(Eb_N0_db, theoryBer, 'b.-');
+hold on;
+semilogy(Eb_N0_db, simBer, 'mx-');
+axis([-3 10 10^-5 1])
+grid on;
+legend('Theory', 'Simulation');
+xlabel('Eb/N0 (dB)');
+ylabel('Bit Error Rate');
+title('Bit error probability curve for BPSK Modulation');
+clear;
+clc;
+N = 10^6; % Number of bits
+rng(100); % Set random seed for reproducibility
+% Generate random binary data
+ip = rand(1, N) > 0.5; % Random bits (0 or 1)
+s = 2*ip - 1; % BPSK modulation (0 -> -1, 1 -> +1)
+n = (1/sqrt(2)) * (randn(1,N) + 1i*randn(1,N)); % AWGN noise
+Eb_N0_db = -3:10; % Eb/N0 range in dB
+nErr_awgn = zeros(1, length(Eb_N0_db)); % AWGN error count
+nErr_rayleigh = zeros(1, length(Eb_N0_db)); % Rayleigh error count
+for ii = 1:length(Eb_N0_db)
+% AWGN Channel
+  y_awgn = s + 10^(-Eb_N0_db(ii)/20) * n;
+  ipHat_awgn = real(y_awgn) > 0;
+  nErr_awgn(ii) = sum(ip ~= ipHat_awgn);
+% Rayleigh Fading Channel
+h = (1/sqrt(2)) * (randn(1,N) + 1i*randn(1,N)); % Rayleigh fading coefficient
+y_rayleigh = h .* s + 10^(-Eb_N0_db(ii)/20) * n; % Received signal
+y_equalized = y_rayleigh ./ h; % Equalization
+ipHat_rayleigh = real(y_equalized) > 0; % Decision based on real part
+nErr_rayleigh(ii) = sum(ip ~= ipHat_rayleigh);
+end
+% Compute BER
+simBer_awgn = nErr_awgn / N;
+simBer_rayleigh = nErr_rayleigh / N;
+% Theoretical BER calculations
+theoryBer_awgn = 0.5 * erfc(sqrt(10.^(Eb_N0_db / 10))); % AWGN
+theoryBer_rayleigh = 0.5 * (1 - sqrt(10.^(Eb_N0_db / 10) ./ (1 + 10.^(Eb_N0_db / 10)))); % Rayleigh
+% Plot results
+figure;
+semilogy(Eb_N0_db, theoryBer_awgn, 'b.-', 'LineWidth', 1.5); hold on;
+semilogy(Eb_N0_db, simBer_awgn, 'mx-', 'LineWidth', 1.5);
+semilogy(Eb_N0_db, theoryBer_rayleigh, 'g.-', 'LineWidth', 1.5);
+semilogy(Eb_N0_db, simBer_rayleigh, 'ro-', 'LineWidth', 1.5);
+grid on;
+legend('Theory (AWGN)', 'Simulation (AWGN)', 'Theory (Rayleigh)', 'Simulation (Rayleigh)');
+xlabel('Eb/N0 (dB)');
+ylabel('Bit Error Rate (BER)');
+title('BER Performance of BPSK in AWGN and Rayleigh Fading Channels');
+axis([-3 10 10^-5 1]); % Set axis limits
