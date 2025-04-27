@@ -1,0 +1,58 @@
+exp2 :
+% Mobile Computing Numerical Simulation
+% (Octave Version)
+
+% Given Data
+subscribers = [10000, 15000, 5000];
+radii = [25, 30, 15];  % in km
+channels_available = 10;
+
+% Constants
+call_attempt_rate = 0.1;  % 10% busy hour call attempts
+call_duration_min = 3;    % in minutes
+blocking_target = 0.02;   % 2% blocking
+
+% Calculate traffic per subscriber (Erlangs)
+traffic_per_subscriber = (call_attempt_rate * call_duration_min) / 60;
+
+% Calculate total traffic per zone
+traffic = subscribers * traffic_per_subscriber;
+
+% Display traffic
+for i = 1:3
+    fprintf('Zone %d: %.2f Erlangs\n', i, traffic(i));
+end
+
+% Estimated channel requirements (approximate)
+required_channels = [64, 90, 36];  % from Erlang B tables for 2% blocking
+
+% Reuse Strategy
+printf("\nReuse Strategy:\n");
+zones = {"Zone 1", "Zone 2", "Zone 3"};
+static_channels = [6, 8, 4];
+dynamic_channels = [2, 4, 2];
+total_channels = static_channels + dynamic_channels;
+
+for i = 1:3
+    printf("%s: Static %d, Dynamic %d, Total %d channels\n", ...
+        zones{i}, static_channels(i), dynamic_channels(i), total_channels(i));
+end
+
+% Dynamic Borrowing Simulation
+printf("\nDynamic Borrowing Scenario:\n");
+
+% After borrowing
+zone1_channels = 9;  % 6 + 2 + 1 borrowed
+zone2_channels = 14; % 8 + 4 + 2 borrowed
+zone3_channels = 3;  % 4 - 1 (borrowed) and Half-Rate
+
+% Final Blocking Probabilities (approximate calculation)
+blocking_probability = @(traffic, channels) max(0, (traffic - channels * 5) / traffic) * 100;
+
+zone1_blocking = blocking_probability(traffic(1), zone1_channels);
+zone2_blocking = blocking_probability(traffic(2), zone2_channels);
+zone3_blocking = blocking_probability(traffic(3), zone3_channels);
+
+fprintf('Zone 1 Blocking: %.2f%%\n', zone1_blocking);
+fprintf('Zone 2 Blocking: %.2f%%\n', zone2_blocking);
+fprintf('Zone 3 Blocking (Half Rate): %.2f%%\n', zone3_blocking);
